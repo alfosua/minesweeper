@@ -135,6 +135,7 @@ type CellProps = {
 
 const Cell = (props: CellProps) => {
   const { x, y, targetMines } = props
+  const gameState = useStore((state) => state.game.state)
   const width = useStore((state) => state.map.width)
   const mines = useStore((state) => state.map.mines)
   const lose = useStore((state) => state.game.state === 'lose')
@@ -145,6 +146,9 @@ const Cell = (props: CellProps) => {
   const mineMap = useStore((state) => state.mineMap)
 
   const discoverCell = () => {
+    if (gameState === 'lose') {
+      return
+    }
     if (mines === 0) {
       mineMap(targetMines, x, y)
       changeGameState('sweeping')
