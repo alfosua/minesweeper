@@ -189,7 +189,7 @@ interface MinesweeperStore {
   mineMap: (mines: number, seedX: number, seedY: number) => void
 }
 
-type CellData = {
+export type CellData = {
   hidden: boolean
   flagged: boolean
   mine: boolean
@@ -225,7 +225,7 @@ const createCell = (
   y: number,
   mapWidth: number,
   mapHeight: number,
-) => {
+): CellData => {
   const cell = {
     hidden: true,
     flagged: false,
@@ -235,6 +235,7 @@ const createCell = (
     x,
     y,
   }
+
   addNeighbourToCell(cell, cell.x > 0, -1, 0, mapWidth)
   addNeighbourToCell(cell, cell.x < mapWidth - 1, 1, 0, mapWidth)
   addNeighbourToCell(cell, cell.y > 0, 0, -1, mapWidth)
@@ -259,8 +260,8 @@ const createCell = (
 }
 
 const createMap = (width: number, height: number) => {
-  const cells = [...Array(height).keys()].flatMap((row) =>
-    [...Array(width).keys()].map((column) =>
+  const cells = Array.from({ length: height }).flatMap((_, row) =>
+    Array.from({ length: width }, (_, column) =>
       createCell(column, row, width, height),
     ),
   )
