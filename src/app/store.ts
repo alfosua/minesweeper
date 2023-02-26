@@ -135,7 +135,6 @@ export const useStore = create<MinesweeperStore>((set, get) => ({
           let cellMined = false
           while (!cellMined) {
             const cellIndex = Math.floor(Math.random() * width * height)
-            console.log(cellIndex)
 
             if (indicesToAvoid.includes(cellIndex)) {
               continue
