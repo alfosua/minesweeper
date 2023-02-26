@@ -151,9 +151,38 @@ const Cell = (props: CellProps) => {
     }
   }
 
+  const cellBgClass =
+    (cell.hidden && cell.flagged && 'bg-orange-100') ||
+    (cell.hidden && !cell.flagged && 'bg-purple-300') ||
+    (!cell.hidden && cell.mine && 'bg-red-300') ||
+    'bg-white'
+
+  const cellTextClass =
+    (!cell.hidden && !cell.mine && cell.nearbyMines === 1 && 'text-blue-600') ||
+    (!cell.hidden &&
+      !cell.mine &&
+      cell.nearbyMines === 2 &&
+      'text-green-600') ||
+    (!cell.hidden &&
+      !cell.mine &&
+      cell.nearbyMines === 3 &&
+      'text-yellow-600') ||
+    (!cell.hidden &&
+      !cell.mine &&
+      cell.nearbyMines === 4 &&
+      'text-purple-600') ||
+    (!cell.hidden && !cell.mine && cell.nearbyMines === 5 && 'text-red-600') ||
+    (!cell.hidden && !cell.mine && cell.nearbyMines === 6 && 'text-red-900') ||
+    (!cell.hidden &&
+      !cell.mine &&
+      cell.nearbyMines === 7 &&
+      'text-brown-900') ||
+    (!cell.hidden && !cell.mine && cell.nearbyMines === 8 && 'text-black') ||
+    'text-black'
+
   return (
     <div
-      className='w-11 h-11 bg-white border-2 border-amber-200 flex items-center justify-center'
+      className={`w-11 h-11 bg-white border-2 border-purple-500 flex items-center justify-center font-bold text-red ${cellBgClass} ${cellTextClass}`}
       onClick={discoverCell}
       onContextMenu={(e) => {
         e.preventDefault()
