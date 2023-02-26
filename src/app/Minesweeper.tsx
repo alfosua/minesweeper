@@ -137,6 +137,7 @@ const Cell = (props: CellProps) => {
   const { x, y, targetMines } = props
   const width = useStore((state) => state.map.width)
   const mines = useStore((state) => state.map.mines)
+  const lose = useStore((state) => state.game.state === 'lose')
   const cell = useStore((state) => state.map.cells[x + y * width])
   const discoverAndExpand = useStore((state) => state.discoverAndExpand)
   const toggleFlag = useStore((state) => state.toggleFlag)
@@ -172,11 +173,19 @@ const Cell = (props: CellProps) => {
         toggleCellFlag()
       }}
     >
-      {cell.hidden && cell.flagged && '🚩'}
-      {cell.hidden && !cell.flagged && '?'}
-      {!cell.hidden && cell.mine && '💥'}
-      {!cell.hidden && !cell.mine && cell.nearbyMines === 0 && '·'}
-      {!cell.hidden && !cell.mine && cell.nearbyMines > 0 && cell.nearbyMines}
+      {cell.mine && lose
+        ? '💥'
+        : cell.hidden
+        ? cell.flagged
+          ? '🚩'
+          : '?'
+        : cell.mine
+        ? '💥'
+        : cell.nearbyMines === 0
+        ? '·'
+        : cell.nearbyMines > 0
+        ? cell.nearbyMines
+        : null}
     </div>
   )
 }
