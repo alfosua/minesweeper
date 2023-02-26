@@ -1,7 +1,7 @@
 import produce from 'immer'
 import { create } from 'zustand'
 
-export const useStore = create<MinesweeperStore>((set) => ({
+export const useStore = create<MinesweeperStore>((set, get) => ({
   map: {
     width: 0,
     height: 0,
@@ -62,12 +62,11 @@ export const useStore = create<MinesweeperStore>((set) => ({
             return
           }
 
-          if (cell.nearbyMines > 0) {
+          const cellsToEnqueue = getNeighbours(state.map, cell.x, cell.y)
+          const nearbyMines = cellsToEnqueue.filter((c) => c.mine).length
+          if (nearbyMines > 0) {
             continue
           }
-          const cellsToEnqueue = cell.neighbours
-            .map((n) => state.map.cells[n.index])
-            .filter((c) => c.hidden)
           queue.push(...cellsToEnqueue)
         }
       }),
@@ -124,17 +123,21 @@ export const useStore = create<MinesweeperStore>((set) => ({
       produce<MinesweeperStore>((state) => {
         const { cells, width, height } = state.map
         const seedIndex = seedX + seedY * width
-        const seedNeighbourIndices = cells[seedIndex].neighbours.map(
-          (n) => n.index,
+        const seedNeighbourIndices = getNeighbourIndices(
+          state.map,
+          seedX,
+          seedY,
         )
+
         const indicesToAvoid = [seedIndex, ...seedNeighbourIndices]
 
         for (let i = 0; i < mines; i++) {
           let cellMined = false
           while (!cellMined) {
-            const cellIndex = Math.round(Math.random() * width * height)
+            const cellIndex = Math.floor(Math.random() * width * height)
+            console.log(cellIndex)
 
-            if (indicesToAvoid.some((i) => i === cellIndex)) {
+            if (indicesToAvoid.includes(cellIndex)) {
               continue
             }
 
@@ -147,12 +150,6 @@ export const useStore = create<MinesweeperStore>((set) => ({
           }
         }
 
-        for (const cell of cells) {
-          cell.nearbyMines = cell.neighbours
-            .map((n) => cells[n.index])
-            .filter((c) => c.mine).length
-        }
-
         state.map.mines = mines
       }),
     ),
@@ -162,6 +159,9 @@ export const useStore = create<MinesweeperStore>((set) => ({
         state.game.state = newGameState
       }),
     ),
+  getNearbyMines: (x: number, y: number) => {
+    return getNearbyMines(get().map, x, y)
+  },
 }))
 
 type GameMap = {
@@ -187,6 +187,7 @@ interface MinesweeperStore {
   hideAll: () => void
   changeGameState: (state: GameState) => void
   mineMap: (mines: number, seedX: number, seedY: number) => void
+  getNearbyMines: (x: number, y: number) => number
 }
 
 export type CellData = {
@@ -195,76 +196,66 @@ export type CellData = {
   mine: boolean
   x: number
   y: number
-  nearbyMines: number
-  neighbours: NeighbourData[]
 }
 
-type NeighbourPosition = -1 | 0 | 1
-
-type NeighbourData = {
-  index: number
-  x: NeighbourPosition
-  y: NeighbourPosition
-}
-
-const addNeighbourToCell = (
-  cell: CellData,
-  condition: boolean,
-  x: NeighbourPosition,
-  y: NeighbourPosition,
-  mapWidth: number,
-) => {
-  if (condition) {
-    const index = cell.x + x + (cell.y + y) * mapWidth
-    cell.neighbours.push({ index, x, y })
-  }
-}
-
-const createCell = (
-  x: number,
-  y: number,
-  mapWidth: number,
-  mapHeight: number,
-): CellData => {
+const createCell = (x: number, y: number): CellData => {
   const cell = {
     hidden: true,
     flagged: false,
     mine: false,
-    nearbyMines: 0,
-    neighbours: [],
     x,
     y,
   }
 
-  addNeighbourToCell(cell, cell.x > 0, -1, 0, mapWidth)
-  addNeighbourToCell(cell, cell.x < mapWidth - 1, 1, 0, mapWidth)
-  addNeighbourToCell(cell, cell.y > 0, 0, -1, mapWidth)
-  addNeighbourToCell(cell, cell.y < mapHeight - 1, 0, 1, mapWidth)
-  addNeighbourToCell(cell, cell.x > 0 && cell.y > 0, -1, -1, mapWidth)
-  addNeighbourToCell(
-    cell,
-    cell.x < mapWidth - 1 && cell.y < mapHeight - 1,
-    1,
-    1,
-    mapWidth,
-  )
-  addNeighbourToCell(
-    cell,
-    cell.x > 0 && cell.y < mapHeight - 1,
-    -1,
-    1,
-    mapWidth,
-  )
-  addNeighbourToCell(cell, cell.x < mapWidth - 1 && cell.y > 0, 1, -1, mapWidth)
   return cell
 }
 
 const createMap = (width: number, height: number) => {
   const cells = Array.from({ length: height }).flatMap((_, row) =>
-    Array.from({ length: width }, (_, column) =>
-      createCell(column, row, width, height),
-    ),
+    Array.from({ length: width }, (_, column) => createCell(column, row)),
   )
   const map: GameMap = { width, height, cells, mines: 0 }
   return map
+}
+
+function getNeighbourIndices(
+  { width, height }: GameMap,
+  x: number,
+  y: number,
+): number[] {
+  const neighbours = []
+
+  for (let i = -1; i <= 1; i++) {
+    for (let j = -1; j <= 1; j++) {
+      if (i === 0 && j === 0) {
+        continue
+      }
+
+      const neighbourX = x + i
+      const neighbourY = y + j
+
+      if (
+        neighbourX < 0 ||
+        neighbourX >= width ||
+        neighbourY < 0 ||
+        neighbourY >= height
+      ) {
+        continue
+      }
+
+      const neighbourIndex = neighbourX + neighbourY * width
+      neighbours.push(neighbourIndex)
+    }
+  }
+
+  return neighbours
+}
+
+function getNeighbours(map: GameMap, x: number, y: number): CellData[] {
+  const { cells } = map
+  return getNeighbourIndices(map, x, y).map((i) => cells[i])
+}
+
+function getNearbyMines(map: GameMap, x: number, y: number): number {
+  return getNeighbours(map, x, y).filter((c) => c.mine).length
 }

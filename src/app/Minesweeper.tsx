@@ -144,6 +144,7 @@ const Cell = (props: CellProps) => {
   const toggleFlag = useStore((state) => state.toggleFlag)
   const changeGameState = useStore((state) => state.changeGameState)
   const mineMap = useStore((state) => state.mineMap)
+  const nearbyMines = useStore((state) => state.getNearbyMines(x, y))
 
   const discoverCell = () => {
     if (gameState === 'lose') {
@@ -165,8 +166,7 @@ const Cell = (props: CellProps) => {
   }
 
   const cellBgClass = getCellBgClass(cell)
-
-  const cellTextClass = getCellTextColor(cell)
+  const cellTextClass = getCellTextColor(cell, nearbyMines)
 
   return (
     <div
@@ -185,10 +185,10 @@ const Cell = (props: CellProps) => {
           : '?'
         : cell.mine
         ? '💥'
-        : cell.nearbyMines === 0
+        : nearbyMines === 0
         ? '·'
-        : cell.nearbyMines > 0
-        ? cell.nearbyMines
+        : nearbyMines > 0
+        ? nearbyMines
         : null}
     </div>
   )
@@ -206,7 +206,7 @@ function getCellBgClass(cell: CellData) {
     : 'bg-white'
 }
 
-function getCellTextColor(cell: CellData) {
+function getCellTextColor(cell: CellData, nearbyMines: number) {
   if (cell.hidden || cell.mine) return 'text-black'
 
   return (
@@ -219,6 +219,6 @@ function getCellTextColor(cell: CellData) {
       6: 'text-red-900',
       7: 'text-brown-900',
       8: 'text-black',
-    }[cell.nearbyMines] || 'text-black'
+    }[nearbyMines] || 'text-black'
   )
 }
