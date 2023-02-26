@@ -1,5 +1,5 @@
 'use client'
-import { useStore } from '@/app/store'
+import { CellData, useStore } from '@/app/store'
 import { ReactNode, useCallback, useState } from 'react'
 
 useStore.getState().setup(10, 10)
@@ -29,14 +29,22 @@ const Minesweeper = () => {
 
   return (
     <div className='flex gap-12 bg-violet-800 w-[100vw] h-[100vh] justify-center items-center'>
-      <div className='font-mono border-3 border-purple-100'>
-        {[...Array(height).keys()].map((row) => (
-          <div key={row} data-row={row} className='flex flex-row'>
-            {[...Array(width).keys()].map((column) => (
-              <Cell key={column} x={column} y={row} targetMines={targetMines} />
-            ))}
-          </div>
-        ))}
+      <div
+        className='font-mono border-3 border-purple-100 grid'
+        style={{
+          gridTemplate: `repeat(${width}, 1fr) / repeat(${height}, 1fr)`,
+        }}
+      >
+        {Array.from({ length: height }, (_, row) =>
+          Array.from({ length: width }, (_, column) => (
+            <Cell
+              key={`${row}-${column}`}
+              x={column}
+              y={row}
+              targetMines={targetMines}
+            />
+          )),
+        )}
       </div>
 
       <div className='flex items-center'>
@@ -151,34 +159,9 @@ const Cell = (props: CellProps) => {
     }
   }
 
-  const cellBgClass =
-    (cell.hidden && cell.flagged && 'bg-orange-100') ||
-    (cell.hidden && !cell.flagged && 'bg-purple-300') ||
-    (!cell.hidden && cell.mine && 'bg-red-300') ||
-    'bg-white'
+  const cellBgClass = getCellBgClass(cell)
 
-  const cellTextClass =
-    (!cell.hidden && !cell.mine && cell.nearbyMines === 1 && 'text-blue-600') ||
-    (!cell.hidden &&
-      !cell.mine &&
-      cell.nearbyMines === 2 &&
-      'text-green-600') ||
-    (!cell.hidden &&
-      !cell.mine &&
-      cell.nearbyMines === 3 &&
-      'text-yellow-600') ||
-    (!cell.hidden &&
-      !cell.mine &&
-      cell.nearbyMines === 4 &&
-      'text-purple-600') ||
-    (!cell.hidden && !cell.mine && cell.nearbyMines === 5 && 'text-red-600') ||
-    (!cell.hidden && !cell.mine && cell.nearbyMines === 6 && 'text-red-900') ||
-    (!cell.hidden &&
-      !cell.mine &&
-      cell.nearbyMines === 7 &&
-      'text-brown-900') ||
-    (!cell.hidden && !cell.mine && cell.nearbyMines === 8 && 'text-black') ||
-    'text-black'
+  const cellTextClass = getCellTextColor(cell)
 
   return (
     <div
@@ -199,3 +182,30 @@ const Cell = (props: CellProps) => {
 }
 
 export default Minesweeper
+
+function getCellBgClass(cell: CellData) {
+  return cell.hidden
+    ? cell.flagged
+      ? 'bg-orange-100'
+      : 'bg-purple-300'
+    : cell.mine
+    ? 'bg-red-300'
+    : 'bg-white'
+}
+
+function getCellTextColor(cell: CellData) {
+  if (cell.hidden || cell.mine) return 'text-black'
+
+  return (
+    {
+      1: 'text-blue-600',
+      2: 'text-green-600',
+      3: 'text-yellow-600',
+      4: 'text-purple-600',
+      5: 'text-red-600',
+      6: 'text-red-900',
+      7: 'text-brown-900',
+      8: 'text-black',
+    }[cell.nearbyMines] || 'text-black'
+  )
+}
