@@ -182,7 +182,7 @@ const Cell = (props: CellProps) => {
 
   return (
     <div
-      className={`w-11 h-11 bg-white border-2 border-purple-500 flex items-center justify-center font-bold text-red ${cellBgClass} ${cellTextClass}`}
+      className={`w-11 h-11 border-2 border-purple-500 flex items-center justify-center font-bold text-red ${cellBgClass} ${cellTextClass}`}
       onClick={discoverCell}
       onContextMenu={(e) => {
         e.preventDefault()
