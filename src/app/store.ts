@@ -78,24 +78,7 @@ export const useStore = create<MinesweeperStore>((set, get) => ({
         cell.flagged = !cell.flagged
         state.game.flags += cell.flagged ? 1 : -1
 
-        const flagCountIsSameAsMineCount =
-          state.map.cells.filter((c) => c.flagged).length === state.map.mines
-
-        const allCellsAreDiscoveredOrFlagged = state.map.cells.every(
-          (c) => !c.hidden || c.flagged,
-        )
-
-        const allMinesAreFlagged = state.map.cells
-          .filter((c) => c.mine)
-          .every((c) => c.flagged)
-
-        if (
-          flagCountIsSameAsMineCount &&
-          allCellsAreDiscoveredOrFlagged &&
-          allMinesAreFlagged
-        ) {
-          state.game.cellsLeft = 0
-          state.game.state = 'win'
+        if (checkWin(state)) {
           return
         }
       }),
@@ -257,4 +240,29 @@ function getNeighbours(map: GameMap, x: number, y: number): CellData[] {
 
 function getNearbyMines(map: GameMap, x: number, y: number): number {
   return getNeighbours(map, x, y).filter((c) => c.mine).length
+}
+
+function checkWin(state: MinesweeperStore) {
+  const flagCountIsSameAsMineCount =
+    state.map.cells.filter((c) => c.flagged).length === state.map.mines
+
+  const allCellsAreDiscoveredOrFlagged = state.map.cells.every(
+    (c) => !c.hidden || c.flagged,
+  )
+
+  const allMinesAreFlagged = state.map.cells
+    .filter((c) => c.mine)
+    .every((c) => c.flagged)
+
+  const win =
+    flagCountIsSameAsMineCount &&
+    allCellsAreDiscoveredOrFlagged &&
+    allMinesAreFlagged
+
+  if (win) {
+    state.game.cellsLeft = 0
+    state.game.state = 'win'
+  }
+
+  return win
 }
