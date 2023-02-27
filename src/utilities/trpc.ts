@@ -1,4 +1,9 @@
-import { createTRPCProxyClient, httpBatchLink } from '@trpc/client'
+import {
+  createTRPCProxyClient,
+  createWSClient,
+  httpBatchLink,
+  wsLink,
+} from '@trpc/client'
 // import { createTRPCNext } from '@trpc/next'
 import type { AppRouter } from '../server/routers/_app'
 
@@ -19,16 +24,27 @@ function getBaseUrl() {
   return `http://localhost:${process.env.PORT ?? 3000}`
 }
 
+const http = httpBatchLink({
+  /**
+   * If you want to use SSR, you need to use the server's full URL
+   * @link https://trpc.io/docs/ssr
+   **/
+  url: `${getBaseUrl()}/api/trpc`,
+})
+
 export const trpc = createTRPCProxyClient<AppRouter>({
-  links: [
-    httpBatchLink({
-      /**
-       * If you want to use SSR, you need to use the server's full URL
-       * @link https://trpc.io/docs/ssr
-       **/
-      url: `${getBaseUrl()}/api/trpc`,
-    }),
-  ],
+  links:
+    typeof window === 'undefined'
+      ? [http]
+      : [
+          // create persistent WebSocket connection
+          wsLink({
+            client: createWSClient({
+              url: `ws://localhost:3001`,
+            }),
+          }),
+          http,
+        ],
 })
 
 // export const trpc = createTRPCNext<AppRouter>({

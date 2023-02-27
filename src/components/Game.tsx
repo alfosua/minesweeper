@@ -1,18 +1,12 @@
 'use client'
-import { CellData, useGameStore } from '@/stores/game'
-import { ReactNode, useCallback, useEffect } from 'react'
-import { onSnapshot, doc } from 'firebase/firestore'
-import { DbMap } from '@/types/db'
-import { db } from '@/utils/firebase'
 import GameProvider from '@/components/GameProvider'
+import { CellData, useGameStore } from '@/stores/game'
+import { DbMap } from '@/types/db'
+import { useLiveMap } from '@/utilities/useLiveMap'
+import { ReactNode, useCallback, useEffect } from 'react'
 
 type GameProps = {
-  data: {
-    id: string
-    width: number
-    height: number
-    mineCount: number
-  }
+  data: DbMap & { id: string; mineCount: number }
 }
 
 const WrappedGame = (props: GameProps) => (
@@ -49,14 +43,13 @@ const Game = (props: GameProps) => {
     changeGameState('lose')
   }, [discoverAll, changeGameState])
 
-  useEffect(() => {
-    const q = doc(db, 'maps', '3PzmhDw7yNWPeTQv72sV')
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.data() as DbMap
-      console.log({ ...data, id: snapshot.id })
-    })
-    return () => unsubscribe()
-  }, [syncFromDb])
+  const liveData = useLiveMap({
+    id: data.id,
+    initialData: data,
+    onData(data) {
+      console.log(data)
+    },
+  })
 
   return (
     <div className='flex gap-12 bg-violet-800 w-[100vw] h-[100vh] justify-center items-center'>

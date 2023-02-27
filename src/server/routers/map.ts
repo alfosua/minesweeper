@@ -1,8 +1,8 @@
 import { procedure, router } from '@/server/trpc'
-import { dbMapSchema, mapConverter } from '@/types/db'
+import { DbMap, dbMapSchema, mapConverter } from '@/types/db'
 import { TRPCError } from '@trpc/server'
 import { observable } from '@trpc/server/observable'
-import { doc, getDoc, onSnapshot } from 'firebase/firestore'
+import { doc, getDoc, onSnapshot, type Firestore } from 'firebase/firestore'
 import { z } from 'zod'
 
 export const mapRouter = router({
@@ -21,15 +21,19 @@ export const mapRouter = router({
   onMapChange: procedure
     .input(z.string())
     .subscription(async ({ ctx, input: id }) => {
-      return observable((emit) => {
-        return onSnapshot(
-          doc(ctx.firestore, 'maps', id),
-          (snapshot) => {
-            const data = dbMapSchema.parse(snapshot.data())
-            emit.next({ ...data, id: snapshot.id })
-          },
-          (error) => emit.error(error),
-        )
-      })
+      return observeMapChanges(ctx.firestore, id)
     }),
 })
+
+function observeMapChanges(firestore: Firestore, id: string) {
+  return observable<DbMap & { id: string }>((emit) => {
+    return onSnapshot(
+      doc(firestore, 'maps', id),
+      (snapshot) => {
+        const data = dbMapSchema.parse(snapshot.data())
+        emit.next({ ...data, id: snapshot.id })
+      },
+      (error) => emit.error(error),
+    )
+  })
+}
