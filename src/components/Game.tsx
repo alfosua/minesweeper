@@ -1,31 +1,62 @@
 'use client'
-import { CellData, useStore } from '@/app/store'
-import { ReactNode, useCallback, useState } from 'react'
+import { CellData, useGameStore } from '@/stores/game'
+import { ReactNode, useCallback, useEffect } from 'react'
+import { onSnapshot, doc } from 'firebase/firestore'
+import { DbMap } from '@/types/db'
+import { db } from '@/utils/firebase'
+import GameProvider from '@/components/GameProvider'
 
-useStore.getState().setup(10, 10)
+type GameProps = {
+  data: {
+    id: string
+    width: number
+    height: number
+    mineCount: number
+  }
+}
 
-const Minesweeper = () => {
-  const { cellsLeft, flags, state: gameState } = useStore((state) => state.game)
-  const width = useStore((state) => state.map.width)
-  const mines = useStore((state) => state.map.mines)
-  const height = useStore((state) => state.map.height)
-  const setup = useStore((state) => state.setup)
-  const discoverAll = useStore((state) => state.discoverAll)
-  // const hideAll = useStore((state) => state.hideAll)
-  const changeGameState = useStore((state) => state.changeGameState)
+const WrappedGame = (props: GameProps) => (
+  <GameProvider>
+    <Game {...props} />
+  </GameProvider>
+)
 
-  const [targetWidth, setTargetWidth] = useState<number>(10)
-  const [targetHeight, setTargetHeight] = useState<number>(10)
-  const [targetMines, setTargetMines] = useState<number>(20)
+const Game = (props: GameProps) => {
+  const { data } = props
+  const {
+    cellsLeft,
+    flags,
+    state: gameState,
+  } = useGameStore((state) => state.game)
+  const width = useGameStore((state) => state.map.width)
+  const mines = useGameStore((state) => state.map.mines)
+  const height = useGameStore((state) => state.map.height)
+  const setup = useGameStore((state) => state.setup)
+  const discoverAll = useGameStore((state) => state.discoverAll)
+  const syncFromDb = useGameStore((state) => state.syncFromDb)
+  const changeGameState = useGameStore((state) => state.changeGameState)
+
+  useEffect(() => {
+    setup(data.width, data.height)
+  }, [setup, data])
 
   const restart = () => {
-    setup(targetWidth, targetHeight)
+    setup(data.width, data.height)
   }
 
   const surrender = useCallback(() => {
     discoverAll()
     changeGameState('lose')
   }, [discoverAll, changeGameState])
+
+  useEffect(() => {
+    const q = doc(db, 'maps', '3PzmhDw7yNWPeTQv72sV')
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.data() as DbMap
+      console.log({ ...data, id: snapshot.id })
+    })
+    return () => unsubscribe()
+  }, [syncFromDb])
 
   return (
     <div className='flex gap-12 bg-violet-800 w-[100vw] h-[100vh] justify-center items-center'>
@@ -41,7 +72,7 @@ const Minesweeper = () => {
               key={`${row}-${column}`}
               x={column}
               y={row}
-              targetMines={targetMines}
+              targetMines={data.mineCount}
             />
           )),
         )}
@@ -70,34 +101,7 @@ const Minesweeper = () => {
   )
 }
 
-// const MasterModal = () => {
-//   return (
-//     <div className='flex flex-col'>
-//       <p>Master Command Palette</p>
-//       <div>
-//         <input
-//           value={targetWidth}
-//           onChange={(e) => setTargetWidth(Number.parseInt(e.target.value))}
-//           type='number'
-//         />
-//         <input
-//           value={targetHeight}
-//           onChange={(e) => setTargetHeight(Number.parseInt(e.target.value))}
-//           type='number'
-//         />
-//       </div>
-//       <div>
-//         <input
-//           value={targetMines}
-//           onChange={(e) => setTargetMines(Number.parseInt(e.target.value))}
-//           type='number'
-//         />
-//       </div>
-//       <button onClick={discoverAll}>Discover All</button>
-//       <button onClick={hideAll}>Hide All</button>
-//     </div>
-//   )
-// }
+export default WrappedGame
 
 type PanelFieldProps = {
   name: string
@@ -135,16 +139,16 @@ type CellProps = {
 
 const Cell = (props: CellProps) => {
   const { x, y, targetMines } = props
-  const gameState = useStore((state) => state.game.state)
-  const width = useStore((state) => state.map.width)
-  const mines = useStore((state) => state.map.mines)
-  const lose = useStore((state) => state.game.state === 'lose')
-  const cell = useStore((state) => state.map.cells[x + y * width])
-  const discoverAndExpand = useStore((state) => state.discoverAndExpand)
-  const toggleFlag = useStore((state) => state.toggleFlag)
-  const changeGameState = useStore((state) => state.changeGameState)
-  const mineMap = useStore((state) => state.mineMap)
-  const nearbyMines = useStore((state) => state.getNearbyMines(x, y))
+  const gameState = useGameStore((state) => state.game.state)
+  const width = useGameStore((state) => state.map.width)
+  const mines = useGameStore((state) => state.map.mines)
+  const lose = useGameStore((state) => state.game.state === 'lose')
+  const cell = useGameStore((state) => state.map.cells[x + y * width])
+  const discoverAndExpand = useGameStore((state) => state.discoverAndExpand)
+  const toggleFlag = useGameStore((state) => state.toggleFlag)
+  const changeGameState = useGameStore((state) => state.changeGameState)
+  const mineMap = useGameStore((state) => state.mineMap)
+  const nearbyMines = useGameStore((state) => state.getNearbyMines(x, y))
 
   const discoverCell = () => {
     if (gameState === 'lose') {
@@ -193,8 +197,6 @@ const Cell = (props: CellProps) => {
     </div>
   )
 }
-
-export default Minesweeper
 
 function getCellBgClass(cell: CellData) {
   return cell.hidden

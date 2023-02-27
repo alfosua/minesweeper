@@ -1,7 +1,11 @@
 import produce from 'immer'
-import { create } from 'zustand'
+import { createStore, StateCreator, StoreApi, useStore } from 'zustand'
+import { createContext, ReactNode, useContext, useRef } from 'react'
+import { DbMap } from '@/types/db'
 
-export const useStore = create<MinesweeperStore>((set, get) => ({
+export const GameStoreContext = createContext<StoreApi<GameStore> | null>(null)
+
+const definition: StateCreator<GameStore> = (set, get) => ({
   map: {
     width: 0,
     height: 0,
@@ -15,7 +19,7 @@ export const useStore = create<MinesweeperStore>((set, get) => ({
   },
   setup: (width, height) =>
     set(
-      produce<MinesweeperStore>((state) => {
+      produce<GameStore>((state) => {
         state.map = createMap(width, height)
         state.game.cellsLeft = state.map.cells.length
         state.game.state = 'start'
@@ -24,7 +28,7 @@ export const useStore = create<MinesweeperStore>((set, get) => ({
     ),
   discoverAndExpand: (x, y) =>
     set(
-      produce<MinesweeperStore>((state) => {
+      produce<GameStore>((state) => {
         const queue = [state.map.cells[x + y * state.map.width]]
         while (queue.length > 0) {
           const cell = queue.shift()
@@ -41,24 +45,7 @@ export const useStore = create<MinesweeperStore>((set, get) => ({
             return
           }
 
-          const flagCountIsSameAsMineCount =
-            state.map.cells.filter((c) => c.flagged).length === state.map.mines
-
-          const allCellsAreDiscoveredOrFlagged = state.map.cells.every(
-            (c) => !c.hidden || c.flagged,
-          )
-
-          const allMinesAreFlagged = state.map.cells
-            .filter((c) => c.mine)
-            .every((c) => c.flagged)
-
-          if (
-            flagCountIsSameAsMineCount &&
-            allCellsAreDiscoveredOrFlagged &&
-            allMinesAreFlagged
-          ) {
-            state.game.cellsLeft = 0
-            state.game.state = 'win'
+          if (checkWin(state)) {
             return
           }
 
@@ -73,7 +60,7 @@ export const useStore = create<MinesweeperStore>((set, get) => ({
     ),
   toggleFlag: (x, y) =>
     set(
-      produce<MinesweeperStore>((state) => {
+      produce<GameStore>((state) => {
         const cell = state.map.cells[x + y * state.map.width]
         cell.flagged = !cell.flagged
         state.game.flags += cell.flagged ? 1 : -1
@@ -85,7 +72,7 @@ export const useStore = create<MinesweeperStore>((set, get) => ({
     ),
   discoverAll: () =>
     set(
-      produce<MinesweeperStore>((state) => {
+      produce<GameStore>((state) => {
         for (const cell of state.map.cells) {
           cell.hidden = false
         }
@@ -94,7 +81,7 @@ export const useStore = create<MinesweeperStore>((set, get) => ({
     ),
   hideAll: () =>
     set(
-      produce<MinesweeperStore>((state) => {
+      produce<GameStore>((state) => {
         for (const cell of state.map.cells) {
           cell.hidden = true
           state.game.cellsLeft += 1
@@ -103,7 +90,7 @@ export const useStore = create<MinesweeperStore>((set, get) => ({
     ),
   mineMap: (mines: number, seedX: number, seedY: number) =>
     set(
-      produce<MinesweeperStore>((state) => {
+      produce<GameStore>((state) => {
         const { cells, width, height } = state.map
         const seedIndex = seedX + seedY * width
         const seedNeighbourIndices = getNeighbourIndices(
@@ -137,25 +124,31 @@ export const useStore = create<MinesweeperStore>((set, get) => ({
     ),
   changeGameState: (newGameState) =>
     set(
-      produce<MinesweeperStore>((state) => {
+      produce<GameStore>((state) => {
         state.game.state = newGameState
+      }),
+    ),
+  syncFromDb: (data) =>
+    set(
+      produce<GameStore>((state) => {
+        for (const cell of state.map.cells.filter(
+          (c) =>
+            c.mine && data.mines.some((m) => m === getCellIndex(c, state.map)),
+        )) {
+          cell.mine = false
+        }
+        for (const mine of data.mines) {
+          state.map.cells[mine].mine = true
+        }
       }),
     ),
   getNearbyMines: (x: number, y: number) => {
     return getNearbyMines(get().map, x, y)
   },
-}))
+  getCellIndex: (x: number, y: number) => getCellIndex({ x, y }, get().map),
+})
 
-type GameMap = {
-  width: number
-  height: number
-  cells: CellData[]
-  mines: number
-}
-
-type GameState = 'start' | 'sweeping' | 'win' | 'lose'
-
-interface MinesweeperStore {
+export interface GameStore {
   map: GameMap
   game: {
     state: GameState
@@ -169,8 +162,19 @@ interface MinesweeperStore {
   hideAll: () => void
   changeGameState: (state: GameState) => void
   mineMap: (mines: number, seedX: number, seedY: number) => void
+  syncFromDb: (data: DbMap) => void
   getNearbyMines: (x: number, y: number) => number
+  getCellIndex: (x: number, y: number) => number
 }
+
+export type GameMap = {
+  width: number
+  height: number
+  cells: CellData[]
+  mines: number
+}
+
+type GameState = 'start' | 'sweeping' | 'win' | 'lose'
 
 export type CellData = {
   hidden: boolean
@@ -180,24 +184,41 @@ export type CellData = {
   y: number
 }
 
-const createCell = (x: number, y: number): CellData => {
-  const cell = {
+export function createGameStore() {
+  return createStore<GameStore>(definition)
+}
+
+export function useGameStore<U>(
+  selector: (state: GameStore) => U,
+  equalityFn?: (a: U, b: U) => boolean,
+) {
+  const store = useContext(GameStoreContext)
+  if (!store) {
+    throw new Error('You can only use this inside a game store context')
+  }
+  return useStore(store, selector, equalityFn)
+}
+
+function createMap(width: number, height: number) {
+  const cells = Array.from({ length: height }).flatMap((_, row) =>
+    Array.from({ length: width }, (_, column) => createCell(column, row)),
+  )
+  const map: GameMap = { width, height, cells, mines: 0 }
+  return map
+}
+
+function createCell(x: number, y: number): CellData {
+  return {
     hidden: true,
     flagged: false,
     mine: false,
     x,
     y,
   }
-
-  return cell
 }
 
-const createMap = (width: number, height: number) => {
-  const cells = Array.from({ length: height }).flatMap((_, row) =>
-    Array.from({ length: width }, (_, column) => createCell(column, row)),
-  )
-  const map: GameMap = { width, height, cells, mines: 0 }
-  return map
+function getCellIndex({ x, y }: { x: number; y: number }, { width }: GameMap) {
+  return x + y * width
 }
 
 function getNeighbourIndices(
@@ -242,7 +263,7 @@ function getNearbyMines(map: GameMap, x: number, y: number): number {
   return getNeighbours(map, x, y).filter((c) => c.mine).length
 }
 
-function checkWin(state: MinesweeperStore) {
+function checkWin(state: GameStore) {
   const flagCountIsSameAsMineCount =
     state.map.cells.filter((c) => c.flagged).length === state.map.mines
 
