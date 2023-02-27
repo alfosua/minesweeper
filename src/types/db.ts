@@ -4,14 +4,17 @@ import {
   SnapshotOptions,
   WithFieldValue,
 } from 'firebase/firestore'
+import { z } from 'zod'
 
-export type DbMap = {
-  width: number
-  height: number
-  mines: number[]
-  discoveries: number[]
-  flags: number[]
-}
+export const dbMapSchema = z.object({
+  width: z.number(),
+  height: z.number(),
+  mines: z.array(z.number()),
+  discoveries: z.array(z.number()),
+  flags: z.array(z.number()),
+})
+
+export type DbMap = z.infer<typeof dbMapSchema>
 
 export const mapConverter = {
   toFirestore(values: WithFieldValue<DbMap>): DocumentData {
@@ -22,7 +25,7 @@ export const mapConverter = {
     snapshot: QueryDocumentSnapshot,
     options: SnapshotOptions,
   ): DbMap {
-    const { width, height, mines, flags, discoveries } = snapshot.data(options)!
-    return { width, height, mines, flags, discoveries }
+    const data = snapshot.data(options)
+    return dbMapSchema.parse(data)
   },
 }
